@@ -656,12 +656,13 @@ export const db = {
       .from("match_participants")
       .select("id, match_id, user_id, in_game_name, in_game_uid, kills, squad_rank, joined_at")
       .eq("match_id", id)
-      .order("joined_at");
-    const { data: appParts } = await supabase
+      .order("joined_at", { ascending: true });
+    const { data: appParts, error: appPartsError } = await supabase
       .from("app_match_participants")
       .select("id, match_id, app_user_id, in_game_name, in_game_uid, kills, squad_rank, joined_at")
       .eq("match_id", id)
-      .order("joined_at");
+      .order("joined_at", { ascending: true });
+    const appPartsSafe = appPartsError ? [] : (appParts ?? []);
     const participants = [
       ...(parts ?? []).map((p) => ({
         id: p.id,
@@ -671,7 +672,7 @@ export const db = {
         joinedAt: p.joined_at,
         rank: p.squad_rank ?? undefined,
       })),
-      ...(appParts ?? []).map((p) => ({
+      ...appPartsSafe.map((p) => ({
         id: p.id,
         matchId: p.match_id,
         userId: p.app_user_id,

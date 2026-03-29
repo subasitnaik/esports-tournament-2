@@ -59,7 +59,12 @@ function setStoredJoined(matchId: string, userId: string, joined: boolean) {
 }
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const isGet = !options?.method || options.method === "GET";
+  const bust =
+    isGet && !path.includes("_cb=") && !path.includes("?t=")
+      ? `${path.includes("?") ? "&" : "?"}_cb=${Date.now()}`
+      : "";
+  const res = await fetch(`${path}${bust}`, {
     ...options,
     credentials: "include",
     cache: "no-store",
@@ -150,24 +155,59 @@ function MatchDetailContent() {
     if (stored) refreshUser();
   }, [refreshUser]);
 
+  const fetchMatch = useCallback(() => {
+    if (!id) return;
+    api<MatchDetail>(`/api/matches/${id}`)
+      .then(setMatch)
+      .catch(() => setMatch(null));
+  }, [id]);
+
+  const fetchParticipants = useCallback(() => {
+    if (!id) return;
+    api<Participant[]>(`/api/matches/${id}/participants`)
+      .then(setParticipants)
+      .catch(() => setParticipants([]));
+  }, [id]);
+
+  const refreshMatchAndParticipants = useCallback(() => {
+    if (!id) return;
+    setLoadingMatch(true);
+    Promise.all([api<MatchDetail>(`/api/matches/${id}`), api<Participant[]>(`/api/matches/${id}/participants`)])
+      .then(([m, parts]) => {
+        setMatch(m);
+        setParticipants(parts ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMatch(false));
+  }, [id]);
+
   useEffect(() => {
     if (!id) {
       setLoadingMatch(false);
       return;
     }
-    setLoadingMatch(true);
-    api<MatchDetail>(`/api/matches/${id}`)
-      .then(setMatch)
-      .catch(() => setMatch(null))
-      .finally(() => setLoadingMatch(false));
-  }, [id]);
+    refreshMatchAndParticipants();
+  }, [id, refreshMatchAndParticipants]);
 
   useEffect(() => {
-    if (!id) return;
-    api<Participant[]>(`/api/matches/${id}/participants?t=${Date.now()}`)
-      .then(setParticipants)
-      .catch(() => setParticipants([]));
-  }, [id]);
+    if (!id || !user) return;
+    const t = setInterval(() => {
+      fetchMatch();
+      fetchParticipants();
+    }, 8000);
+    return () => clearInterval(t);
+  }, [id, user, fetchMatch, fetchParticipants]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && id) {
+        fetchMatch();
+        fetchParticipants();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [id, fetchMatch, fetchParticipants]);
 
   useEffect(() => {
     if (user?.id && id) {
@@ -177,14 +217,8 @@ function MatchDetailContent() {
     }
   }, [user?.id, id]);
 
-  const hasJoined = (user && participants.some((p) => p.userId === user.id)) || hasJoinedOverride;
-
-  const fetchParticipants = useCallback(() => {
-    if (!id) return;
-    api<Participant[]>(`/api/matches/${id}/participants?t=${Date.now()}`)
-      .then(setParticipants)
-      .catch(() => setParticipants([]));
-  }, [id]);
+  const hasJoined =
+    (user && participants.some((p) => String(p.userId) === String(user.id))) || hasJoinedOverride;
 
   const handleJoin = async () => {
     if (!inGameName.trim() || !inGameUid.trim()) {
@@ -206,7 +240,10 @@ function MatchDetailContent() {
       setHasJoinedOverride(true);
       if (user?.id && id) setStoredJoined(id, user.id, true);
       refreshUser();
-      await fetchParticipants();
+      await Promise.all([
+        api<MatchDetail>(`/api/matches/${id}`).then(setMatch),
+        api<Participant[]>(`/api/matches/${id}/participants`).then(setParticipants),
+      ]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to join";
       if (msg.toLowerCase().includes("already registered")) {
@@ -214,7 +251,10 @@ function MatchDetailContent() {
         setInGameUid("");
         setHasJoinedOverride(true);
         if (user?.id && id) setStoredJoined(id, user.id, true);
-        await fetchParticipants();
+        await Promise.all([
+          api<MatchDetail>(`/api/matches/${id}`).then(setMatch),
+          api<Participant[]>(`/api/matches/${id}/participants`).then(setParticipants),
+        ]);
       } else {
         setJoinError(msg);
       }
@@ -355,13 +395,16 @@ function MatchDetailContent() {
             </div>
           </div>
 
-          {match.status === "ongoing" && match.roomCode && match.roomPassword && (
-            <div className="mt-6 rounded-xl border border-[#f97316]/30 bg-[#f97316]/10 p-4">
-              <p className="text-sm font-semibold text-[#f97316]">Room Details</p>
-              <p className="mt-1 font-mono text-white">Code: {match.roomCode}</p>
-              <p className="font-mono text-white">Password: {match.roomPassword}</p>
-            </div>
-          )}
+          {hasJoined &&
+            match.roomCode &&
+            match.roomPassword &&
+            (match.status === "upcoming" || match.status === "ongoing") && (
+              <div className="mt-6 rounded-xl border border-[#f97316]/30 bg-[#f97316]/10 p-4">
+                <p className="text-sm font-semibold text-[#f97316]">Room Details</p>
+                <p className="mt-1 font-mono text-white">Code: {match.roomCode}</p>
+                <p className="font-mono text-white">Password: {match.roomPassword}</p>
+              </div>
+            )}
 
           {match.prizePool?.rankRewards && match.prizePool.rankRewards.length > 0 && (
             <div className="mt-6">
@@ -442,7 +485,11 @@ function MatchDetailContent() {
               )}
             </div>
             <button
-              onClick={fetchParticipants}
+              type="button"
+              onClick={() => {
+                fetchMatch();
+                fetchParticipants();
+              }}
               className="rounded-lg px-3 py-1.5 text-sm text-[#94A3B8] hover:bg-white/5 hover:text-white"
             >
               Refresh
