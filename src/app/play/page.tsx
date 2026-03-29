@@ -724,11 +724,11 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
   useEffect(() => {
     setLoadingInitial(true);
     Promise.all([
-      api<{ chargePercent?: number }>("/api/withdrawal-charge").then((r) => r.chargePercent ?? 0),
+      api<{ chargePercent?: number }>("/api/withdrawal-charge").then((r) => Number(r.chargePercent) || 0),
       api<Transaction[]>(`/api/users/${user.id}/transactions`).then((r) => r ?? []),
     ])
       .then(([charge, tx]) => {
-        setWithdrawalCharge(charge);
+        setWithdrawalCharge(Number.isFinite(charge) ? charge : 0);
         setTransactions(tx);
       })
       .catch(() => {})
@@ -738,6 +738,13 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
   useEffect(() => {
     if (subTab === "history" && onRefreshUser) onRefreshUser();
   }, [subTab, onRefreshUser]);
+
+  useEffect(() => {
+    if (subTab !== "withdraw") return;
+    api<{ chargePercent?: number }>("/api/withdrawal-charge")
+      .then((r) => setWithdrawalCharge(Number(r.chargePercent) || 0))
+      .catch(() => {});
+  }, [subTab]);
 
   const [refreshingTx, setRefreshingTx] = useState(false);
   const refreshTransactions = useCallback(() => {
@@ -843,16 +850,14 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
         {subTab === "withdraw" && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-medium text-white">Withdraw Coins</h3>
-            {withdrawalCharge > 0 && (
-              <p className="mt-2 text-sm text-[#94A3B8]">Fee: {withdrawalCharge}%</p>
-            )}
+            <p className="mt-4 text-sm text-[#94A3B8]">Fee: {withdrawalCharge}%</p>
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Amount (coins)"
               type="number"
               min={1}
-              className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-[#64748B]"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-[#64748B]"
             />
             {receiveAfterCharge !== null && (
               <div className="mt-3 rounded-xl border border-[#f97316]/25 bg-[#f97316]/10 px-4 py-3">

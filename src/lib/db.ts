@@ -384,8 +384,10 @@ export const db = {
   async getWithdrawalCharge(): Promise<number> {
     const supabase = getSupabase();
     if (!supabase) return 0;
-    const { data } = await supabase.from("app_settings").select("value").eq("key", "withdrawal_charge").single();
-    return data?.value ? parseInt(data.value, 10) : 0;
+    const { data, error } = await supabase.from("app_settings").select("value").eq("key", "withdrawal_charge").maybeSingle();
+    if (error || !data?.value) return 0;
+    const n = Number(String(data.value).trim());
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
   },
 
   async setWithdrawalCharge(percent: number): Promise<number> {
