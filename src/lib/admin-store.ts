@@ -95,7 +95,12 @@ const gameModes: GameMode[] = [];
 const defaultPrizePool: PrizePool = {
   coinsPerKill: 5,
   totalPrizePool: 0,
-  rankRewards: [{ fromRank: 1, toRank: 5, coins: 30 }, { fromRank: 6, toRank: 10, coins: 20 }],
+  rankRewards: [
+    { fromRank: 1, toRank: 1, coins: 0 },
+    { fromRank: 2, toRank: 2, coins: 0 },
+    { fromRank: 3, toRank: 3, coins: 0 },
+    { fromRank: 6, toRank: 10, coins: 0 },
+  ],
 };
 
 const matches: Match[] = [];

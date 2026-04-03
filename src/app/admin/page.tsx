@@ -767,7 +767,11 @@ function MatchesSection({
   const [matchType, setMatchType] = useState<MatchType>("solo");
   const [coinsPerKill, setCoinsPerKill] = useState("5");
   const [totalPrizePool, setTotalPrizePool] = useState("");
-  const [rankRewards, setRankRewards] = useState<RankReward[]>([{ fromRank: 1, toRank: 5, coins: 30 }]);
+  const [rankRewards, setRankRewards] = useState<RankReward[]>([
+    { fromRank: 1, toRank: 1, coins: 0 },
+    { fromRank: 2, toRank: 2, coins: 0 },
+    { fromRank: 3, toRank: 3, coins: 0 },
+  ]);
   const [submitting, setSubmitting] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [matchTab, setMatchTab] = useState<"upcoming" | "ongoing" | "finished">("upcoming");
@@ -821,7 +825,11 @@ function MatchesSection({
       setMatchType("solo");
       setCoinsPerKill("5");
       setTotalPrizePool("");
-      setRankRewards([{ fromRank: 1, toRank: 5, coins: 30 }]);
+      setRankRewards([
+        { fromRank: 1, toRank: 1, coins: 0 },
+        { fromRank: 2, toRank: 2, coins: 0 },
+        { fromRank: 3, toRank: 3, coins: 0 },
+      ]);
       setSelectedMatchId(data?.id ?? null);
       setMatchTab("upcoming");
       onSuccess();
@@ -921,63 +929,100 @@ function MatchesSection({
             </div>
             <div className="space-y-3">
               <label className="block text-xs text-slate-400">Rank rewards (coins per rank range)</label>
-              {rankRewards.map((r, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={r.fromRank}
-                    onChange={(e) =>
-                      setRankRewards((prev) =>
-                        prev.map((x, j) => (j === i ? { ...x, fromRank: Number(e.target.value) || 1 } : x))
-                      )
-                    }
-                    className="admin-input w-16 rounded-lg px-3 py-2 text-sm text-white outline-none"
-                  />
+              <p className="text-xs text-slate-500">
+                Ranks 1–3 are fixed; use + Add rank range for more (e.g. 4th–10th).
+              </p>
+              {([0, 1, 2] as const).map((slot) => (
+                <div key={slot} className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex w-16 shrink-0 items-center justify-center rounded-lg border border-slate-600/40 bg-slate-800/40 px-3 py-2 text-sm text-slate-300">
+                    {slot + 1}
+                  </span>
                   <span className="text-slate-500">-</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={r.toRank}
-                    onChange={(e) =>
-                      setRankRewards((prev) =>
-                        prev.map((x, j) => (j === i ? { ...x, toRank: Number(e.target.value) || 1 } : x))
-                      )
-                    }
-                    className="admin-input w-16 rounded-lg px-3 py-2 text-sm text-white outline-none"
-                  />
+                  <span className="inline-flex w-16 shrink-0 items-center justify-center rounded-lg border border-slate-600/40 bg-slate-800/40 px-3 py-2 text-sm text-slate-300">
+                    {slot + 1}
+                  </span>
                   <span className="text-slate-500">→</span>
                   <input
                     type="number"
                     min="0"
-                    value={r.coins}
-                    onChange={(e) =>
-                      setRankRewards((prev) =>
-                        prev.map((x, j) => (j === i ? { ...x, coins: Number(e.target.value) || 0 } : x))
-                      )
-                    }
+                    value={rankRewards[slot]?.coins ?? 0}
+                    onChange={(e) => {
+                      const coins = Number(e.target.value) || 0;
+                      setRankRewards((prev) => {
+                        const next = [...prev];
+                        while (next.length < 3) {
+                          next.push({ fromRank: next.length + 1, toRank: next.length + 1, coins: 0 });
+                        }
+                        next[slot] = { fromRank: slot + 1, toRank: slot + 1, coins };
+                        return next;
+                      });
+                    }}
                     className="admin-input w-20 rounded-lg px-3 py-2 text-sm text-white outline-none"
                     placeholder="coins"
                   />
                   <span className="text-slate-400 text-sm">coins</span>
-                  <button
-                    type="button"
-                    onClick={() => setRankRewards((prev) => prev.filter((_, j) => j !== i))}
-                    className="rounded p-1.5 text-rose-400 hover:bg-rose-500/20"
-                    aria-label="Remove"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
               ))}
+              {rankRewards.slice(3).map((r, sliceIdx) => {
+                const i = sliceIdx + 3;
+                return (
+                  <div key={i} className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={r.fromRank}
+                      onChange={(e) =>
+                        setRankRewards((prev) =>
+                          prev.map((x, j) => (j === i ? { ...x, fromRank: Number(e.target.value) || 1 } : x)),
+                        )
+                      }
+                      className="admin-input w-16 rounded-lg px-3 py-2 text-sm text-white outline-none"
+                    />
+                    <span className="text-slate-500">-</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={r.toRank}
+                      onChange={(e) =>
+                        setRankRewards((prev) =>
+                          prev.map((x, j) => (j === i ? { ...x, toRank: Number(e.target.value) || 1 } : x)),
+                        )
+                      }
+                      className="admin-input w-16 rounded-lg px-3 py-2 text-sm text-white outline-none"
+                    />
+                    <span className="text-slate-500">→</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={r.coins}
+                      onChange={(e) =>
+                        setRankRewards((prev) =>
+                          prev.map((x, j) => (j === i ? { ...x, coins: Number(e.target.value) || 0 } : x)),
+                        )
+                      }
+                      className="admin-input w-20 rounded-lg px-3 py-2 text-sm text-white outline-none"
+                      placeholder="coins"
+                    />
+                    <span className="text-slate-400 text-sm">coins</span>
+                    <button
+                      type="button"
+                      onClick={() => setRankRewards((prev) => prev.filter((_, j) => j !== i))}
+                      className="rounded p-1.5 text-rose-400 hover:bg-rose-500/20"
+                      aria-label="Remove range"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
               <button
                 type="button"
                 onClick={() =>
                   setRankRewards((prev) => {
-                    const maxTo = Math.max(0, ...prev.map((r) => r.toRank));
-                    return [...prev, { fromRank: maxTo + 1, toRank: maxTo + 5, coins: 10 }];
+                    const maxTo = prev.length > 0 ? Math.max(...prev.map((r) => r.toRank)) : 0;
+                    return [...prev, { fromRank: maxTo + 1, toRank: maxTo + 3, coins: 0 }];
                   })
                 }
                 className="rounded-lg border border-dashed border-slate-500 px-3 py-2 text-sm text-slate-400 hover:border-orange-500/50 hover:text-orange-400"
@@ -1299,7 +1344,10 @@ function MatchDetailView({
           <p className="text-slate-200">Coins per kill: {match.prizePool?.coinsPerKill ?? 0}</p>
           {(match.prizePool?.rankRewards ?? []).map((r: RankReward, i: number) => (
             <p key={i} className="text-slate-200">
-              Rank {r.fromRank}-{r.toRank}: {r.coins} coins
+              {r.fromRank === r.toRank
+                ? `Rank ${r.fromRank}`
+                : `Ranks ${r.fromRank}–${r.toRank}`}
+              : {r.coins} coins
             </p>
           ))}
         </div>

@@ -42,7 +42,15 @@ export async function POST(request: Request) {
           .filter((r) => r && typeof r.fromRank === "number" && typeof r.toRank === "number" && typeof r.coins === "number")
           .map((r) => ({ fromRank: r.fromRank, toRank: r.toRank, coins: r.coins })),
       }
-    : { coinsPerKill: 5, totalPrizePool: 0, rankRewards: [{ fromRank: 1, toRank: 5, coins: 30 }] };
+    : {
+        coinsPerKill: 5,
+        totalPrizePool: 0,
+        rankRewards: [
+          { fromRank: 1, toRank: 1, coins: 0 },
+          { fromRank: 2, toRank: 2, coins: 0 },
+          { fromRank: 3, toRank: 3, coins: 0 },
+        ],
+      };
   const mode = await store.getMode(gameModeId);
   if (mode && admin.gamesAccessType === "specific" && !admin.isMasterAdmin && !admin.allowedGameIds.includes(mode.gameId)) {
     return NextResponse.json({ error: "No access to this game" }, { status: 403 });

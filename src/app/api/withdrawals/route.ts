@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 import { getAppUserId } from "@/lib/app-auth";
 
+const MIN_WITHDRAW = 100;
 const MAX_WITHDRAW = 1_000_000;
 
 export async function POST(request: Request) {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
     const num = Number(amount);
     if (isNaN(num) || num <= 0) {
       return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
+    }
+    if (num < MIN_WITHDRAW) {
+      return NextResponse.json({ error: `Minimum withdrawal is ${MIN_WITHDRAW} coins` }, { status: 400 });
     }
     if (num > MAX_WITHDRAW) {
       return NextResponse.json({ error: "Amount exceeds maximum" }, { status: 400 });

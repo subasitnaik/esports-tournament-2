@@ -759,14 +759,24 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
   const depositAmountNum = parseInt(depositAmount, 10);
   const canProceedToPayment = !isNaN(depositAmountNum) && depositAmountNum > 0;
 
+  const MIN_WITHDRAW = 100;
+  const WITHDRAW_QUICK_ADD = [100, 300, 500, 800, 1000] as const;
+
   const withdrawAmountNum = parseInt(amount, 10);
-  const withdrawAmountValid = !isNaN(withdrawAmountNum) && withdrawAmountNum > 0;
+  const withdrawEntryPositive = !isNaN(withdrawAmountNum) && withdrawAmountNum > 0;
+  const withdrawAmountValid = withdrawEntryPositive && withdrawAmountNum >= MIN_WITHDRAW;
   const receiveAfterCharge =
     withdrawAmountValid && withdrawalCharge > 0
       ? Math.round(withdrawAmountNum * (1 - withdrawalCharge / 100))
       : withdrawAmountValid
         ? withdrawAmountNum
         : null;
+
+  const addWithdrawQuick = (n: number) => {
+    const current = parseInt(amount, 10);
+    const base = Number.isNaN(current) ? 0 : current;
+    setAmount(String(base + n));
+  };
 
   const handleProceedToPayment = () => {
     if (!canProceedToPayment) return;
@@ -777,6 +787,10 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
     const amt = parseInt(amount, 10);
     if (!amt || amt <= 0 || !upiId.trim()) {
       setError("Enter valid amount and UPI ID");
+      return;
+    }
+    if (amt < MIN_WITHDRAW) {
+      setError(`Minimum withdrawal is ${MIN_WITHDRAW} coins`);
       return;
     }
     if (user.coins < amt) {
@@ -850,15 +864,32 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
         {subTab === "withdraw" && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-medium text-white">Withdraw Coins</h3>
-            <p className="mt-4 text-sm text-[#94A3B8]">Fee: {withdrawalCharge}%</p>
+            <p className="mt-2 text-sm text-[#94A3B8]">Minimum withdrawal: {MIN_WITHDRAW} coins</p>
+            <p className="mt-1 text-sm text-[#94A3B8]">Fee: {withdrawalCharge}%</p>
+            <p className="mt-3 text-xs text-[#64748B]">Tap to add to amount</p>
+            <div className="mt-2 grid w-full grid-cols-5 gap-1 sm:gap-2">
+              {WITHDRAW_QUICK_ADD.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => addWithdrawQuick(n)}
+                  className="min-w-0 w-full whitespace-nowrap rounded-lg bg-white/10 px-0.5 py-1.5 text-center text-xs font-medium leading-none text-white transition hover:bg-white/20 sm:px-2 sm:py-2.5 sm:text-sm"
+                >
+                  +{n}
+                </button>
+              ))}
+            </div>
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount (coins)"
+              placeholder={`Amount (min ${MIN_WITHDRAW})`}
               type="number"
-              min={1}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-[#64748B]"
+              min={MIN_WITHDRAW}
+              className="mt-3 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-[#64748B]"
             />
+            {withdrawEntryPositive && !withdrawAmountValid && (
+              <p className="mt-2 text-sm text-amber-400">Enter at least {MIN_WITHDRAW} coins to withdraw.</p>
+            )}
             {receiveAfterCharge !== null && (
               <div className="mt-3 rounded-xl border border-[#f97316]/25 bg-[#f97316]/10 px-4 py-3">
                 <p className="text-xs text-[#94A3B8]">You will receive (after fee)</p>
@@ -879,8 +910,14 @@ function CoinsTab({ user, onRefreshUser, onShowToast, initialSubTab }: { user: U
             />
             {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
             <button
+              type="button"
               onClick={handleWithdraw}
-              disabled={loading}
+              disabled={
+                loading ||
+                !withdrawAmountValid ||
+                !upiId.trim() ||
+                withdrawAmountNum > user.coins
+              }
               className="mt-4 w-full rounded-xl bg-[#f97316] py-3 font-semibold text-white disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit"}

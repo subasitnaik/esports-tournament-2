@@ -448,7 +448,11 @@ function MatchDetailContent() {
               <div className="mt-2 space-y-1">
                 {match.prizePool.rankRewards.map((r, i) => (
                   <div key={i} className="flex justify-between text-sm text-[#94A3B8]">
-                    <span>Rank {r.fromRank}–{r.toRank}</span>
+                    <span>
+                      {r.fromRank === r.toRank
+                        ? `Rank ${r.fromRank}`
+                        : `Ranks ${r.fromRank}–${r.toRank}`}
+                    </span>
                     <span className="text-emerald-400">{r.coins} coins</span>
                   </div>
                 ))}
