@@ -813,6 +813,9 @@ export const db = {
     if (!supabase) return null;
     const { data: m } = await supabase.from("matches").select("*").eq("id", id).eq("status", "upcoming").single();
     if (!m) return null;
+    const entryFee = m.entry_fee ?? 0;
+    const title = (m.title as string) ?? "Match";
+
     const { data, error } = await supabase
       .from("matches")
       .update({ status: "cancelled", updated_at: new Date().toISOString() })
@@ -821,6 +824,39 @@ export const db = {
       .select()
       .single();
     if (error || !data) return null;
+
+    if (entryFee > 0) {
+      const { data: appRows } = await supabase.from("app_match_participants").select("app_user_id").eq("match_id", id);
+      const appUserIds = Array.from(new Set((appRows ?? []).map((r: { app_user_id: string }) => r.app_user_id)));
+      for (const appUserId of appUserIds) {
+        const { data: user } = await supabase.from("app_users").select("coins").eq("id", appUserId).single();
+        if (!user || typeof user.coins !== "number") continue;
+        await supabase.from("app_users").update({ coins: user.coins + entryFee }).eq("id", appUserId);
+        await supabase.from("app_coin_transactions").insert({
+          user_id: appUserId,
+          amount: entryFee,
+          type: "refund",
+          reference_id: id,
+          description: `Refund: ${title} cancelled`,
+        });
+      }
+
+      const { data: legacyRows } = await supabase.from("match_participants").select("user_id").eq("match_id", id);
+      const legacyUserIds = Array.from(new Set((legacyRows ?? []).map((r: { user_id: string }) => r.user_id)));
+      for (const userId of legacyUserIds) {
+        const { data: lu } = await supabase.from("users").select("coins").eq("id", userId).single();
+        if (!lu || typeof lu.coins !== "number") continue;
+        await supabase.from("users").update({ coins: lu.coins + entryFee }).eq("id", userId);
+        await supabase.from("coin_transactions").insert({
+          user_id: userId,
+          amount: entryFee,
+          type: "refund",
+          reference_id: id,
+          description: `Refund: ${title} cancelled`,
+        });
+      }
+    }
+
     return toMatch(data);
   },
 
